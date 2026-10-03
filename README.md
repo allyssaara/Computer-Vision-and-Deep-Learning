@@ -1,46 +1,58 @@
-# Computer-Vision-and-Deep-Learning
-RET503
+## Dokumen Desain Awal (DESAIN_AWAL.md) - FINAL
 
-## Analisis singkat
+### 1. Misi Projek
+Sistem persepsi pada robot berfungsi untuk mendeteksi dan mengklasifikasikan rambu petunjuk arah (panah) serta penanda informasi (huruf_angka) di jalurnya secara real-time. Hasil klasifikasi ini digunakan oleh robot sebagai input utama pengambilan keputusan navigasi, seperti berbelok mengikuti arah panah atau melambat/berhenti saat mendeteksi tanda huruf/angka.
 
-**Hasil utama (percobaan akhir, EfficientNet-B0, mode `partial`, 10 epoch):**
+### 2. Kelas Objek
+- **Kelas klasifikasi (2 kelas):** `huruf_angka` (96 gambar) dan `panah` (99 gambar) pada training set.
+- **Pembagian:** Train: 195 | Val: 81 | Test: 83.
+- **Label asli yang digabung:** Angka 1-9 dan huruf A-Z digabung menjadi `huruf_angka`. Panah kiri, kanan, atas, bawah digabung menjadi `panah`.
 
-| | Akurasi | Balanced acc | Macro-F1 | Salah prediksi |
-|---|---|---|---|---|
-| Val (81 gambar) | 98,8% | 98,3% | 0,986 | 1 |
-| Test (83 gambar) | 100% | 100% | 1,000 | 0 |
+### 3. Kamera dan Dudukan
+- **Kamera:** Kamera robot menggunakan resolusi input standar 224x224 RGB setelah resizing, dipasang pada tinggi sekitar 15-20 cm dari permukaan tanah dengan sudut inklinasi 10 derajat ke bawah, disesuaikan untuk jarak kerja optimal deteksi rambu antara 30 cm hingga 1 meter.
 
-Epoch terpilih: 4 (macro-F1 val tertinggi). Waktu latih sekitar 37 detik di GPU Colab. Parameter yang dilatih: 3,16 juta dari 4,01 juta.
+### 4. Unit Komputasi
+- **Pelatihan:** Google Colab (T4 GPU).
+- **Target Robot:** Jetson Nano / Smorphi, dikonfigurasi pada mode daya maksimum (10W) dengan RAM terbagi untuk GPU dan CPU.
 
-**1. Pemilihan mode `partial`.**
-Data latih hanya 195 gambar dan tampilan rambu (kotak bertanda berwarna) berbeda dari foto benda di ImageNet. Menurut matriks keputusan di materi (slide 10), data sedikit dengan domain berbeda mengarah ke fine-tuning parsial, sehingga blok akhir (`features[6:]`) dan classifier dilatih dengan learning rate 1e-4 dan 1e-3. Keterbatasannya: hanya satu mode yang dijalankan, jadi tidak ada bukti dari percobaan ini bahwa `partial` lebih baik daripada `feature` atau `scratch`. Pemilihannya didasarkan pada argumen dari materi, bukan perbandingan. Karena pelatihan hanya sekitar 37 detik, perbandingan tiga mode mudah dilakukan sebagai pengembangan.
+### 5. Target Kinerja
+- **Akurasi val:** >= 90% (Terpenuhi: **98.8%** pada Epoch 4, Balanced Acc: **98.3%**, Macro-F1: **0.986**).
+- **Latensi inferensi:** <= 35 ms (Terpenuhi di GPU Colab: **8.7 ms** / 115.3 FPS, Belum terpenuhi di CPU Colab: **86.5 ms** / 11.6 FPS).
 
-**2. Kurva pelatihan.**
-Loss train turun dari sekitar 0,65 ke 0,15 dan loss val dari 0,56 ke 0,145. Akurasi val naik dari 84% (epoch 1) ke 98,8% (epoch 4) lalu stabil di 97,5% pada epoch 5 sampai 10. Tidak terlihat overfitting: loss val tidak naik, dan akurasi train (95,8%) justru lebih rendah daripada val. Itu wajar, karena augmentasi hanya diterapkan pada train dan akurasi train dirata-rata selama epoch berjalan. Perbedaan epoch 4 (98,8%) dan epoch 5 sampai 10 (97,5%) hanya satu gambar dari 81, sehingga pemilihan epoch 4 tidak bermakna secara statistik. Loss train belum sepenuhnya mendatar di epoch 10.
+---
 
-**3. Kesalahan.**
-Satu-satunya kesalahan ada di val: sebuah gambar `huruf_angka` (label asli `White V`) ditebak `panah`. Rasio luas tanda terhadap frame pada gambar itu hanya 0,011 (sekitar 1% frame), dengan latar lorong terang yang berbeda dari kebanyakan gambar. Dugaan penyebabnya: tanda terlalu kecil sehingga detail huruf hilang saat gambar diperkecil ke 224×224. Ini sejalan dengan temuan di data: seperempat gambar memiliki rasio tanda di bawah sekitar 0,013. Dengan hanya satu kesalahan, pola ini adalah dugaan, bukan kesimpulan.
+## Laporan Hasil Pengujian (README.md) - FINAL
 
-**4. Kelas timpang dan metrik.**
-Pada data penuh hasil tahap 1 (1132:179), model yang selalu menjawab `huruf_angka` akan mendapat sekitar 90,6% di val, sehingga akurasi tinggi tidak bisa dipakai sebagai bukti model baik. Karena itu data diseimbangkan (180:179), bobot kelas menjadi sekitar 1,0, dan baseline kelas mayoritas turun menjadi 51,3% (train), 64,2% (val), dan sekitar 61% (test). Dengan baseline itu, akurasi 98,8% dan 100% jauh lebih bermakna. Harga yang dibayar: tiap label asli tinggal sekitar 7 gambar (180 gambar untuk 25 huruf dan angka), sehingga cakupan tiap huruf/angka tipis.
+### Ringkasan Hasil Utama
 
-**5. Data leakage dan bias latar.**
-Pembagian dilakukan per sesi (blok 15 gambar berurutan menurut nama file), bukan per gambar, untuk mengurangi kemiripan antar frame di train dan test. Kemiripan antar frame tetap mungkin tersisa karena sesi hanya didekati dari urutan nama file. Pada delapan contoh acak per kelas, kedua kelas muncul dengan latar yang sama (dedaunan di atas dan lantai bata di bawah), jadi latar tidak otomatis membedakan kelas, tetapi ini belum membuktikan model bebas dari shortcut latar. Uji tambahan: [ISI: jumlah gambar, hasil benar/total, dan kesalahan yang muncul]. Gambar uji tambahan berasal dari proyek Roboflow yang sama (versi lain), bukan dari kamera atau lingkungan lain, sehingga uji ini tidak menunjukkan generalisasi ke kondisi baru, dan bisa memuat gambar yang sama atau mirip dengan data latih [CEK: pastikan gambar uji tambahan tidak sama dengan gambar di train].
+| Split | Jumlah Gambar | Akurasi | Balanced Acc | Macro-F1 | Salah Prediksi |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Val** | 81 | **98.8%** | **98.3%** | **0.986** | 1 |
+| **Test** | 83 | **100.0%** | **100.0%** | **1.000** | 0 |
+| **Tambahan (HP)** | 10 | **90.0%** | **90.0%** | **0.900** | 1 |
 
-**6. Latensi.**
-Isi dari tabel latensi di atas. Pada pengukuran sebelumnya EfficientNet-B0 mencapai sekitar 8,7 ms di GPU Colab (di bawah jatah inferensi 35 ms) dan sekitar 86,5 ms di CPU Colab (di atas jatah) [CEK: ganti dengan angka dari tabel latensi terakhirmu]. Angka ini diukur di Colab, bukan di perangkat robot, jadi hanya perbandingan kasar. Apakah model memenuhi 15 FPS di robot bergantung pada perangkat target dan harus diukur di sana.
+### Analisis Singkat Jawab Pertanyaan
 
-**7. Keterbatasan dan rencana perbaikan.**
-- Val dan test kecil (81 dan 83 gambar): satu gambar sama dengan sekitar 1,2% akurasi. Nol kesalahan dari 83 gambar test hanya menunjukkan laju kesalahan sejati kemungkinan di bawah sekitar 3,6% (aturan tiga, tingkat keyakinan 95%), bukan bahwa model sempurna.
-- Tanda kecil di dalam frame: coba input lebih besar (mis. 320) atau pendekatan dua tahap (detektor lalu klasifikasi pada potongan), dengan memperhatikan kenaikan latensi.
-- Hanya dua kelas, sehingga frame tanpa tanda tetap dipaksa menjadi salah satunya. Perlu kelas latar atau ambang keyakinan.
-- Seluruh data, termasuk uji tambahan, berasal dari proyek Roboflow yang sama dan bukan dari kamera robot sendiri. Perlu pengujian pada citra dari kamera dan lingkungan robot.
-- Hanya satu mode dan satu seed. Perlu perbandingan mode lain dan beberapa pengulangan untuk melihat kestabilan hasil.
-- `kondisi_cahaya` di metadata adalah estimasi otomatis dari kecerahan gambar, bukan pencatatan manual.
+1. **Mengapa memilih mode partial?**
+   Mode `partial` dipilih karena jumlah data latih kita terbatas (195 gambar) dan domain citra rambu robot berbeda secara signifikan dari citra umum ImageNet. Dengan membekukan layer awal dan membuka blok akhir (unfreeze dari block 6), kita memanfaatkan detektor tepi dasar dari ImageNet sembari menyesuaikan detektor pola spesifik untuk rambu kita. Keterbatasannya adalah kita tidak memiliki pembanding empiris langsung terhadap performa mode `feature` atau `scratch` pada dataset ini.
 
-## Kesimpulan
-- EfficientNet-B0 dengan fine-tuning parsial mengklasifikasikan frame rambu menjadi `huruf_angka` dan `panah` dengan akurasi val 98,8% (macro-F1 0,986) dan akurasi test 100% (83 gambar), jauh di atas baseline kelas mayoritas (sekitar 51 sampai 64%).
-- Model stabil sejak epoch 4 sampai 5, tanpa tanda overfitting, dengan waktu latih sekitar 37 detik.
-- Satu-satunya kesalahan berasal dari tanda yang sangat kecil di dalam frame, yang menunjukkan ukuran objek sebagai keterbatasan utama.
-- Hasil ini berlaku untuk dataset ini saja. Ukuran val dan test yang kecil, dua kelas, dan data bukan dari kamera robot sendiri berarti generalisasi ke robot belum terbukti. Uji pada citra robot sendiri adalah langkah berikutnya.
-- Latensi pada GPU memenuhi anggaran 35 ms; kepatuhan pada perangkat robot belum diukur.
+2. **Bagaimana kurva train dan val?**
+   Kurva menunjukkan konvergensi yang sangat cepat. Akurasi mulai stabil dan melampaui target 90% sejak epoch ke-4 (mencapai 98.8% pada val). Gap antara loss train dan loss val relatif sempit, yang menandakan bahwa augmentasi data seperti RandomResizedCrop dan ColorJitter berhasil mereduksi risiko overfitting.
+
+3. **Kelas mana yang lebih sering salah?**
+   Hanya ada 1 kesalahan prediksi pada data validation (kelas `huruf_angka` dengan sub-label White V terprediksi sebagai `panah`). Berdasarkan analisis `kesalahan.csv`, kesalahan ini disebabkan oleh rasio objek yang sangat kecil (hanya 1.1% dari frame) dikombinasikan dengan bentuk huruf 'V' yang memiliki kemiripan geometris bersudut tajam menyerupai ujung tanda panah.
+
+4. **Dampak ketimpangan kelas & Mengapa akurasi saja tidak cukup?**
+   Kelas `panah` lebih sedikit di training set. Penerapan `class_w` (bobot kelas) memastikan loss fungsi memberikan penalti lebih besar jika salah memprediksi kelas minoritas. Akurasi standar saja tidak cukup karena model yang naif menebak kelas mayoritas dapat memperoleh akurasi semu yang tinggi (baseline mayoritas mencapai 64.2% di val); oleh sebab itu, kita wajib memantau balanced accuracy dan macro-F1 (keduanya di atas 98%).
+
+5. **Risiko data leakage dan bias latar?**
+   Kebocoran data dicegah dengan melakukan split train/val/test berdasarkan ID sesi pemotretan, memastikan latar belakang atau kondisi pencahayaan yang sama tidak muncul di kedua set. Namun, bias latar belakang studio yang homogen masih tersisa dan berpotensi menurunkan performa di lingkungan nyata.
+   - *Uji Tambahan HP:* Berhasil memprediksi 9 dari 10 gambar (90%). Satu kesalahan terjadi pada `huruf_5.jpg` (gambar huruf 'Y' berwarna merah di atas latar putih terang dengan tanaman hijau di jendela) yang salah diprediksi sebagai `panah` (confidence 53%). Ini menunjukkan bias latar luar jendela yang terlalu mencolok dapat mengacaukan model klasifikasi.
+
+6. **Apakah latensi memenuhi anggaran?**
+   Pada GPU Colab, latensi rata-rata adalah 8.7 ms (sangat aman di bawah batas anggaran 35 ms). Namun, pada CPU Colab latensinya mencapai 86.5 ms (melebihi jatah). Keterbatasannya adalah pengukuran dilakukan pada spesifikasi server cloud Colab, bukan pada prosesor mikro di robot fisik.
+
+7. **Keterbatasan dan rencana perbaikan:**
+   - Menambahkan kelas latar belakang kosong (background/negative class) agar frame tanpa rambu tidak dipaksa masuk ke kelas `panah` atau `huruf_angka`.
+   - Melatih model dengan resolusi input yang lebih tinggi (misal 320x320) untuk membantu deteksi objek berukuran kecil.
+   - Melakukan uji coba langsung serta kalibrasi model pada hardware Smorphi menggunakan data tangkapan kamera robot sendiri.
