@@ -1,4 +1,4 @@
-## Dokumen Desain Awal (DESAIN_AWAL.md) - FINAL
+## EfficientNet-B0 Transfer Learning
 
 ### 1. Misi Projek
 Sistem persepsi pada robot berfungsi untuk mendeteksi dan mengklasifikasikan rambu petunjuk arah (panah) serta penanda informasi (huruf_angka) di jalurnya secara real-time. Hasil klasifikasi ini digunakan oleh robot sebagai input utama pengambilan keputusan navigasi, seperti berbelok mengikuti arah panah atau melambat/berhenti saat mendeteksi tanda huruf/angka.
